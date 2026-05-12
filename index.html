@@ -730,6 +730,49 @@
   </div>
 </div>
 
+<!-- PRODUCT UPLOAD MODAL -->
+<div id="product-upload-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:800;align-items:center;justify-content:center;padding:16px;">
+  <div style="background:white;border-radius:12px;width:100%;max-width:460px;overflow:hidden;">
+    <div style="background:var(--brand);color:white;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;">
+      <div>
+        <div style="font-weight:800;font-size:16px;">⬆ Update Products</div>
+        <div style="font-size:12px;opacity:0.85;margin-top:2px;">Export from Unleashed → Products → Product List</div>
+      </div>
+      <button onclick="closeProductUploadModal()" style="background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.3);color:white;padding:5px 12px;border-radius:6px;cursor:pointer;">✕</button>
+    </div>
+    <!-- Warning -->
+    <div style="background:#fff8e1;border-bottom:1px solid #ffe082;padding:12px 16px;display:flex;gap:10px;align-items:flex-start;">
+      <span style="font-size:20px;flex-shrink:0;">⚠️</span>
+      <div style="font-size:13px;color:#5d4037;">
+        <strong>This upload will overwrite all current products.</strong><br>
+        The existing product list will be replaced entirely with products from the uploaded file.
+        EAN barcodes already saved will be preserved where product codes match.
+      </div>
+    </div>
+    <div style="padding:20px;">
+      <div id="pu-drop-zone"
+        style="border:2px dashed var(--border);border-radius:10px;padding:28px 16px;text-align:center;cursor:pointer;transition:border-color 0.2s;"
+        onclick="document.getElementById('pu-file-input').click()"
+        ondragover="event.preventDefault();this.style.borderColor='var(--brand)'"
+        ondragleave="this.style.borderColor='var(--border)'"
+        ondrop="onPuFileDrop(event)">
+        <div style="font-size:32px;margin-bottom:8px;">📋</div>
+        <div style="font-weight:600;color:var(--text);">Drop CSV here or tap to browse</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Unleashed Product List (.csv)</div>
+      </div>
+      <input type="file" id="pu-file-input" accept=".csv" style="display:none" onchange="onPuFileSelected(event)">
+      <div id="pu-file-info" style="display:none;margin-top:12px;padding:10px 14px;background:#f0faf0;border-radius:8px;border:1px solid #c8e6c9;font-size:13px;color:#2e7d32;"></div>
+      <div id="pu-upload-error" style="display:none;margin-top:12px;padding:10px 14px;background:#fff3f3;border-radius:8px;border:1px solid #ffcdd2;font-size:13px;color:#c62828;"></div>
+      <div style="display:flex;gap:10px;margin-top:16px;">
+        <button class="btn btn-secondary" style="flex:1" onclick="closeProductUploadModal()">Cancel</button>
+        <button class="btn btn-primary" style="flex:2;background:#e8401c;" id="pu-upload-btn" disabled onclick="processProductUpload()">
+          ⚠️ Overwrite &amp; Upload
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- SOH UPLOAD MODAL -->
 <div id="soh-upload-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:700;align-items:center;justify-content:center;padding:16px;">
   <div style="background:white;border-radius:12px;width:100%;max-width:460px;overflow:hidden;">
@@ -916,7 +959,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "2.3.4-dev";
+const APP_VERSION = "2.3.5-dev";
 
 // ============================================================
 // EMBEDDED DATA
@@ -2029,6 +2072,161 @@ function filterCompareTable() {
 function closeCompareModal() {
   document.getElementById('compare-modal').style.display = 'none';
   document.body.style.overflow = '';
+}
+
+// ============================================================
+// PRODUCT LIST UPLOAD FROM UNLEASHED CSV
+// ============================================================
+let _parsedProductData = null;
+
+function showProductUploadModal() {
+  _parsedProductData = null;
+  document.getElementById('pu-file-info').style.display = 'none';
+  document.getElementById('pu-upload-error').style.display = 'none';
+  document.getElementById('pu-upload-btn').disabled = true;
+  document.getElementById('pu-file-input').value = '';
+  document.getElementById('pu-drop-zone').innerHTML =
+    '<div style="font-size:32px;margin-bottom:8px;">📋</div>' +
+    '<div style="font-weight:600;color:var(--text);">Drop CSV here or tap to browse</div>' +
+    '<div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Unleashed Product List (.csv)</div>';
+  document.getElementById('product-upload-modal').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+
+function closeProductUploadModal() {
+  document.getElementById('product-upload-modal').style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+function onPuFileDrop(event) {
+  event.preventDefault();
+  document.getElementById('pu-drop-zone').style.borderColor = 'var(--border)';
+  const file = event.dataTransfer.files[0];
+  if (file) parsePuFile(file);
+}
+
+function onPuFileSelected(event) {
+  const file = event.target.files[0];
+  if (file) parsePuFile(file);
+}
+
+function parsePuFile(file) {
+  if (!file.name.toLowerCase().endsWith('.csv')) {
+    showPuError('Please upload a .csv file');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const text = e.target.result;
+      const rows = text.split(/\r?\n/).filter(r => r.trim());
+      // Row 0: title "Product List as of DD/MM/YYYY"
+      // Row 1: headers — Product Code, Product Description, ...
+      // Data from row 2
+      const headerRow = rows[1] || '';
+      const headers   = headerRow.split(',').map(h => h.replace(/"/g,'').trim());
+
+      const colCode = headers.findIndex(h => h.toLowerCase().includes('product code'));
+      const colDesc = headers.findIndex(h => h.toLowerCase().includes('product description'));
+
+      if (colCode < 0 || colDesc < 0) {
+        showPuError('Could not find Product Code / Product Description columns. Is this an Unleashed Product List export?');
+        return;
+      }
+
+      const products = [];
+      for (let i = 2; i < rows.length; i++) {
+        const cols = parseCSVRow(rows[i]);
+        const code = (cols[colCode] || '').trim();
+        const desc = (cols[colDesc] || '').trim();
+        if (!code) continue;
+        products.push({ code, description: desc });
+      }
+
+      if (!products.length) {
+        showPuError('No products found in file');
+        return;
+      }
+
+      _parsedProductData = products;
+      document.getElementById('pu-file-info').style.display = 'block';
+      document.getElementById('pu-file-info').innerHTML =
+        `✓ <strong>${file.name}</strong> — <strong>${products.length} products</strong> ready to upload`;
+      document.getElementById('pu-upload-error').style.display = 'none';
+      document.getElementById('pu-upload-btn').disabled = false;
+      document.getElementById('pu-drop-zone').innerHTML =
+        `<div style="font-size:28px;">✅</div><div style="font-weight:600;color:#2e7d32;">${file.name}</div>`;
+
+    } catch(err) {
+      showPuError('Error parsing file: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+function showPuError(msg) {
+  document.getElementById('pu-upload-error').style.display = 'block';
+  document.getElementById('pu-upload-error').textContent = '⚠️ ' + msg;
+  document.getElementById('pu-file-info').style.display = 'none';
+  document.getElementById('pu-upload-btn').disabled = true;
+}
+
+async function processProductUpload() {
+  if (!_parsedProductData) return;
+  const products = _parsedProductData;
+
+  const btn = document.getElementById('pu-upload-btn');
+  btn.disabled = true;
+  btn.textContent = 'Uploading…';
+  closeProductUploadModal();
+
+  toast(`Uploading ${products.length} products…`, '');
+
+  try {
+    // Build barcode map from existing products to preserve EANs
+    const existing = await getListItems(CONFIG.listProducts);
+    const barcodeMap = {};
+    existing.forEach(p => { if (p.barcode) barcodeMap[p.code] = p.barcode; });
+
+    // Delete all existing product rows in batches
+    const BATCH = 5;
+    for (let i = 0; i < existing.length; i += BATCH) {
+      await Promise.all(existing.slice(i, i + BATCH).map(p =>
+        deleteListItem(CONFIG.listProducts, p.id).catch(() => {})
+      ));
+    }
+
+    // Write new products, restoring barcodes where they existed
+    let written = 0;
+    for (let i = 0; i < products.length; i += BATCH) {
+      await Promise.all(products.slice(i, i + BATCH).map(p =>
+        createListItem(CONFIG.listProducts, {
+          Title:   p.code,
+          field_1: p.description,
+          field_2: barcodeMap[p.code] || ''
+        }).catch(err => console.error('Product write error:', err))
+      ));
+      written += Math.min(BATCH, products.length - i);
+      if (written % 50 === 0 || written === products.length) {
+        toast(`Uploading products… ${written}/${products.length}`, '');
+      }
+    }
+
+    // Reload in-memory product list
+    await loadProducts();
+
+    const preserved = products.filter(p => barcodeMap[p.code]).length;
+    toast(
+      `✓ ${products.length} products uploaded${preserved ? ` · ${preserved} EAN barcodes preserved` : ''}`,
+      'success'
+    );
+
+    // Refresh product search modal if open
+    onProductSearchModal();
+
+  } catch(err) {
+    toast('Error uploading products: ' + err.message, 'error');
+  }
 }
 
 // ============================================================
