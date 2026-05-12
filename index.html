@@ -372,6 +372,7 @@
         <button class="btn btn-success" style="flex:2" onclick="completeStockTake()" id="complete-btn">
           ✓ Complete
         </button>
+        <button class="btn btn-secondary" style="flex:1" onclick="showStockTakeCompare()">📊 Compare</button>
       </div>
     </div>
 
@@ -984,7 +985,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "2.4.8-dev";
+const APP_VERSION = "2.5.0-dev";
 
 // ============================================================
 // EMBEDDED DATA
@@ -1241,7 +1242,7 @@ async function getListItems(listName, filter = '') {
       f.ProductCode    = f.field_3 || '';
       f.ProductDescription = f.field_4 || '';
       f.CountQty       = f.field_5 !== undefined ? Number(f.field_5) : 0;
-      f.BatchCode      = f.BatchCode || '';
+      f.BatchCode      = f.field_6 || '';
     }
     if (listName === CONFIG.listProducts) {
       f.code        = f.Title || '';
@@ -2669,11 +2670,11 @@ function renderStockTakesList(items) {
           <span class="badge ${st.StockTakeStatus === 'Complete' ? 'badge-complete' : 'badge-open'}">${st.StockTakeStatus || 'Open'}</span>
           <button class="btn btn-secondary btn-sm" onclick="viewFullStockTake(${JSON.stringify(st).replace(/"/g, '&quot;')})">📋 View</button>
           <button class="btn btn-secondary btn-sm" onclick="viewLocationsFromHome(${JSON.stringify(st).replace(/"/g, '&quot;')})">🗺 Locations</button>
+          <button class="btn btn-secondary btn-sm" onclick="showStockTakeCompareFromHome(${JSON.stringify(st).replace(/"/g, '&quot;')})">📊 Compare</button>
           ${st.StockTakeStatus !== 'Complete'
             ? `<button class="btn btn-primary btn-sm" onclick="openStockTake(${JSON.stringify(st).replace(/"/g, '&quot;')})">Count →</button>`
             : `<button class="btn btn-secondary btn-sm" onclick="viewSummary(${JSON.stringify(st).replace(/"/g, '&quot;')})">Summary</button>`
           }
-          <button class="btn btn-secondary btn-sm" onclick="showStockTakeCompareFromHome(${JSON.stringify(st).replace(/"/g, '&quot;')})">📊 Compare</button>
           <button class="btn btn-sm" style="background:none;border:1px solid #e0e0e0;color:#c62828;padding:6px 10px;" onclick="deleteStockTake('${st.id}', '${st.Title.replace(/'/g, "\'")}')">🗑</button>
         </div>
       </div>
@@ -3067,6 +3068,8 @@ function selectProduct(product) {
   document.getElementById('sel-prod-code').textContent = product.code;
   document.getElementById('sel-prod-desc').textContent = product.description;
   document.getElementById('add-product-btn').disabled = false;
+  // Render batch dropdown for this product
+  renderBatchDropdown('add-batch-container', 'add-batch', product.code, '');
   document.getElementById('add-qty').focus();
   document.getElementById('add-qty').select();
 }
@@ -3117,7 +3120,7 @@ async function saveEntry(productCode, productDesc, qty, batch = '') {
       field_3:   productCode,            // ProductCode
       field_4:   productDesc || '',      // ProductDescription
       field_5:   qty,                    // CountQty
-      BatchCode: batch || ''             // BatchCode
+      field_6:   batch || ''             // BatchCode
     });
 
     // Push with friendly names so the rest of the app works
