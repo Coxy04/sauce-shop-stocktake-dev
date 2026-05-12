@@ -321,7 +321,7 @@
           <!-- Add product -->
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
             <h3 style="margin-bottom:0;">+ Add Product</h3>
-            <button class="btn btn-secondary btn-sm" onclick="showNewProductModal()" title="Add a product not in the list">+ New Product</button>
+            
           </div>
           <div class="input-with-btn" style="margin-bottom:10px">
             <div class="search-wrapper" style="flex:1">
@@ -413,7 +413,7 @@
           <div class="divider"></div>
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
             <h3 style="margin-bottom:0;">+ Add Product</h3>
-            <button class="btn btn-secondary btn-sm" onclick="showNewProductModal()">+ New Product</button>
+            
           </div>
           <div class="input-with-btn" style="margin-bottom:10px">
             <div class="search-wrapper" style="flex:1">
@@ -487,10 +487,7 @@
           <label>Changelog List Name</label>
           <input type="text" id="sp-list-changelog" placeholder="DevChangelog" value="DevChangelog">
         </div>
-        <div class="form-group">
-          <label>Unleashed Stock List Name</label>
-          <input type="text" id="sp-list-unleashedstock" placeholder="DevUnleashedStock" value="DevUnleashedStock">
-        </div>
+
         <div class="form-group">
           <label>Azure App Client ID</label>
           <input type="text" id="sp-client-id" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
@@ -528,6 +525,10 @@
       </div>
     </div>
     <div style="padding:16px;" id="lv-body"></div>
+    <div id="lv-totals" style="padding:10px 16px;border-top:2px solid var(--brand);background:#fdf3f0;font-size:13px;font-weight:700;color:var(--brand);position:sticky;bottom:0;display:flex;justify-content:space-between;align-items:center;">
+      <span id="lv-totals-lines"></span>
+      <span id="lv-totals-qty"></span>
+    </div>
   </div>
 </div>
 
@@ -831,17 +832,15 @@
     </div>
     <!-- Search/filter -->
     <div style="padding:10px 16px;border-bottom:1px solid var(--border);">
-      <div style="display:flex;gap:8px;">
-        <input type="text" id="compare-search" placeholder="Search product…"
-          autocomplete="off" oninput="filterCompareTable()"
-          style="flex:1;padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;">
-        <select id="compare-filter" onchange="filterCompareTable()"
-          style="padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:white;">
-          <option value="all">All</option>
-          <option value="variance">Variances only</option>
-          <option value="missing">Not in Live WH</option>
-        </select>
-      </div>
+      <input type="text" id="compare-search" placeholder="Search by product code or description…"
+        autocomplete="off" oninput="filterCompareTable()"
+        style="width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:15px;box-sizing:border-box;margin-bottom:8px;">
+      <select id="compare-filter" onchange="filterCompareTable()"
+        style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;background:white;box-sizing:border-box;">
+        <option value="all">Show all products</option>
+        <option value="variance">Variances only</option>
+        <option value="missing">Not in Live Warehouse</option>
+      </select>
     </div>
     <div style="overflow-x:auto;">
       <table style="width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed;">
@@ -858,8 +857,9 @@
         <tbody id="compare-table-body"></tbody>
       </table>
     </div>
-    <div style="padding:12px 16px;border-top:1px solid var(--border);background:white;position:sticky;bottom:0;">
-      <button class="btn btn-secondary btn-full" onclick="closeCompareModal()">Close</button>
+    <div style="padding:12px 16px;border-top:1px solid var(--border);background:white;position:sticky;bottom:0;display:flex;gap:10px;">
+      <button class="btn btn-secondary" style="flex:1" onclick="closeCompareModal()">Close</button>
+      <button class="btn btn-secondary" style="flex:1" onclick="exportCompareCSV()">⬇ Export CSV</button>
     </div>
   </div>
 </div>
@@ -882,17 +882,15 @@
 
     <!-- Search/filter -->
     <div style="padding:10px 16px;border-bottom:1px solid var(--border);">
-      <div style="display:flex;gap:8px;">
-        <input type="text" id="variance-search" placeholder="Search product…"
-          autocomplete="off" oninput="filterVarianceTable()"
-          style="flex:1;padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;">
-        <select id="variance-filter" onchange="filterVarianceTable()"
-          style="padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:white;">
-          <option value="all">All</option>
-          <option value="variance">Variances only</option>
-          <option value="missing">Missing from count</option>
-        </select>
-      </div>
+      <input type="text" id="variance-search" placeholder="Search by product code or description…"
+        autocomplete="off" oninput="filterVarianceTable()"
+        style="width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:15px;box-sizing:border-box;margin-bottom:8px;">
+      <select id="variance-filter" onchange="filterVarianceTable()"
+        style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;background:white;box-sizing:border-box;">
+        <option value="all">Show all products</option>
+        <option value="variance">Variances only</option>
+        <option value="missing">Missing from count</option>
+      </select>
     </div>
 
     <!-- Table -->
@@ -915,9 +913,10 @@
     </div>
 
     <!-- Actions -->
-    <div style="padding:16px;border-top:1px solid var(--border);display:flex;gap:10px;position:sticky;bottom:0;background:white;">
+    <div style="padding:16px;border-top:1px solid var(--border);display:flex;gap:10px;position:sticky;bottom:0;background:white;flex-wrap:wrap;">
       <button class="btn btn-secondary" style="flex:1" onclick="closeVarianceModal()">← Cancel</button>
-      <button class="btn btn-primary" style="flex:2" onclick="acceptVariancesAndComplete()" id="variance-accept-btn">
+      <button class="btn btn-secondary" style="flex:1" onclick="exportVarianceCSV()">⬇ Export CSV</button>
+      <button class="btn btn-primary" style="flex:2;min-width:140px;" onclick="acceptVariancesAndComplete()" id="variance-accept-btn">
         Accept & Complete
       </button>
     </div>
@@ -966,7 +965,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "2.3.6-dev";
+const APP_VERSION = "2.4.3-dev";
 
 // ============================================================
 // EMBEDDED DATA
@@ -1719,6 +1718,7 @@ async function viewLiveWarehouse() {
     bodyEl.innerHTML = body;
     modal.style.display = 'block';
     document.body.style.overflow = 'hidden';
+    updateLvTotals();
   } catch(e) {
     toast('Error loading live warehouse: ' + e.message, 'error');
   }
@@ -1938,43 +1938,10 @@ async function processSohUpload() {
   closeSohUploadModal();
 
   if (_sohMode === 'compare') {
-    // Just use the data locally for comparison — no SharePoint write needed
     await runLiveWarehouseComparison(_parsedSohData.products);
-    return;
-  }
-
-  // stocktake mode — write to SharePoint UnleashedStock list then show variance screen
-  toast(`Saving ${_parsedSohData.products.length} products to SharePoint…`, '');
-  try {
-    // Delete all existing rows for this snapshot ref (or all rows for a fresh load)
-    const existing = await getListItems(CONFIG.listUnleashedStock);
-    const BATCH = 5;
-    for (let i = 0; i < existing.length; i += BATCH) {
-      await Promise.all(existing.slice(i, i + BATCH).map(e =>
-        deleteListItem(CONFIG.listUnleashedStock, e.id).catch(() => {})
-      ));
-    }
-
-    // Write new rows
-    const { products, snapshotRef, snapshotDate } = _parsedSohData;
-    for (let i = 0; i < products.length; i += BATCH) {
-      await Promise.all(products.slice(i, i + BATCH).map(p =>
-        createListItem(CONFIG.listUnleashedStock, {
-          Title:   p.code,
-          field_1: p.qty,
-          field_2: p.wh,
-          field_3: snapshotDate,
-          field_4: snapshotRef
-        }).catch(err => console.error('SOH write error:', err))
-      ));
-      if ((i + BATCH) % 50 === 0) toast(`Saving… ${Math.min(i + BATCH, products.length)}/${products.length}`, '');
-    }
-
-    toast(`Saved ${products.length} products (ref: ${snapshotRef})`, 'success');
-    await showVarianceScreen();
-
-  } catch(err) {
-    toast('Error saving SOH data: ' + err.message, 'error');
+  } else {
+    // Stock take mode — pass data directly to variance screen, no SharePoint needed
+    await showVarianceScreen(_parsedSohData.products);
   }
 }
 
@@ -2079,6 +2046,23 @@ function filterCompareTable() {
 function closeCompareModal() {
   document.getElementById('compare-modal').style.display = 'none';
   document.body.style.overflow = '';
+}
+
+function exportCompareCSV() {
+  const rows = window._compareRows || [];
+  if (!rows.length) { toast('No data to export', 'error'); return; }
+  const wh = WAREHOUSES.find(w => w.id === activeWarehouseTab) || WAREHOUSES[0];
+  const headers = ['Product Code', 'Description', 'Live Warehouse', 'Unleashed', 'Variance'];
+  const csvRows = rows.map(r => [
+    csvEscape(r.code),
+    csvEscape(r.desc || ''),
+    r.live      !== null ? r.live      : '',
+    r.unleashed !== null ? r.unleashed : '',
+    r.variance > 0 ? '+' + r.variance : r.variance
+  ]);
+  const date = new Date().toISOString().slice(0, 10);
+  triggerCSVDownload([headers, ...csvRows], `compare-${wh.id}-${date}.csv`);
+  toast('CSV downloaded', 'success');
 }
 
 // ============================================================
@@ -3013,19 +2997,15 @@ async function completeStockTake() {
   showSohUploadModal('stocktake');
 }
 
-async function showVarianceScreen() {
+async function showVarianceScreen(sohProducts) {
   try {
-    const unleashedStock = await getListItems(CONFIG.listUnleashedStock);
+    // sohProducts passed directly from CSV upload — no SharePoint read needed
     const warehouseName = currentStockTake.Warehouse || '';
-
-    const unleashedForWh = unleashedStock.filter(u =>
-      !u.Warehouse || u.Warehouse === warehouseName
-    );
 
     // Build lookup: productCode -> unleashed qty
     const unleashedMap = {};
-    unleashedForWh.forEach(u => {
-      unleashedMap[u.ProductCode] = (unleashedMap[u.ProductCode] || 0) + (Number(u.QtyOnHand) || 0);
+    (sohProducts || []).forEach(p => {
+      unleashedMap[p.code] = (unleashedMap[p.code] || 0) + (Number(p.qty) || 0);
     });
 
     // Sum counted quantities by product code
@@ -3042,7 +3022,7 @@ async function showVarianceScreen() {
       const unleashed = unleashedMap[code] !== undefined ? unleashedMap[code] : null;
       const variance  = (counted !== null ? counted : 0) - (unleashed !== null ? unleashed : 0);
       const desc = allEntries.find(e => e.ProductCode === code)?.ProductDescription ||
-                   unleashedForWh.find(u => u.ProductCode === code)?.ProductCode || '';
+                   (sohProducts || []).find(p => p.code === code)?.desc || '';
       rows.push({ code, desc, counted, unleashed, variance });
     });
 
@@ -3056,7 +3036,7 @@ async function showVarianceScreen() {
     let summary = `${rows.length} products · ${variances.length} variances · ${matches.length} matches`;
     if (missingCnt)  summary += ` · ${missingCnt} not counted`;
     if (noUnleashed) summary += ` · ${noUnleashed} not in Unleashed`;
-    if (unleashedForWh.length === 0) summary += ' — ⚠️ No Unleashed data for this warehouse';
+    if (!sohProducts || sohProducts.length === 0) summary += ' — ⚠️ No Unleashed data loaded';
     document.getElementById('variance-summary').textContent = summary;
 
     window._varianceRows = rows;
@@ -3120,6 +3100,23 @@ function closeVarianceModal() {
   document.body.style.overflow = '';
   const btn = document.getElementById('variance-accept-btn');
   if (btn) { btn.disabled = false; btn.textContent = 'Accept & Complete'; }
+}
+
+function exportVarianceCSV() {
+  const rows = window._varianceRows || [];
+  if (!rows.length) { toast('No data to export', 'error'); return; }
+  const stName = currentStockTake ? currentStockTake.Title : 'stock-take';
+  const headers = ['Product Code', 'Description', 'Counted', 'Unleashed', 'Variance'];
+  const csvRows = rows.map(r => [
+    csvEscape(r.code),
+    csvEscape(r.desc || ''),
+    r.counted   !== null ? r.counted   : '',
+    r.unleashed !== null ? r.unleashed : '',
+    r.variance > 0 ? '+' + r.variance : r.variance
+  ]);
+  const date = new Date().toISOString().slice(0, 10);
+  triggerCSVDownload([headers, ...csvRows], `variance-${stName}-${date}.csv`);
+  toast('CSV downloaded', 'success');
 }
 
 async function acceptVariancesAndComplete() {
@@ -4130,38 +4127,51 @@ function showLiveView() {
   document.getElementById('lv-body').innerHTML = body;
   document.getElementById('liveview-modal').style.display = 'block';
   document.body.style.overflow = 'hidden';
+  updateLvTotals();
 }
 
 function filterLiveView() {
   const q = (document.getElementById('lv-search').value || '').trim().toLowerCase();
-  const sections = document.querySelectorAll('#lv-body > div[data-location]');
   const allSections = document.querySelectorAll('#lv-body > div');
 
   if (!q) {
     document.querySelectorAll('#lv-body table tr[data-code]').forEach(r => r.style.display = '');
     allSections.forEach(s => s.style.display = '');
-    return;
-  }
-
-  allSections.forEach(section => {
-    const loc = (section.dataset.location || '').toLowerCase();
-    const locMatch = loc.includes(q);
-
-    const rows = section.querySelectorAll('tr[data-code]');
-    let anyRowVisible = false;
-
-    rows.forEach(r => {
-      const code  = (r.dataset.code  || '').toLowerCase();
-      const desc  = (r.dataset.desc  || '').toLowerCase();
-      const batch = (r.dataset.batch || '').toLowerCase();
-      const rowMatch = code.includes(q) || desc.includes(q) || batch.includes(q);
-      // Show row if it matches OR if the whole location matches
-      r.style.display = (rowMatch || locMatch) ? '' : 'none';
-      if (rowMatch || locMatch) anyRowVisible = true;
+  } else {
+    allSections.forEach(section => {
+      const loc = (section.dataset.location || '').toLowerCase();
+      const locMatch = loc.includes(q);
+      const rows = section.querySelectorAll('tr[data-code]');
+      let anyRowVisible = false;
+      rows.forEach(r => {
+        const code  = (r.dataset.code  || '').toLowerCase();
+        const desc  = (r.dataset.desc  || '').toLowerCase();
+        const batch = (r.dataset.batch || '').toLowerCase();
+        const show = code.includes(q) || desc.includes(q) || batch.includes(q) || locMatch;
+        r.style.display = show ? '' : 'none';
+        if (show) anyRowVisible = true;
+      });
+      section.style.display = anyRowVisible ? '' : 'none';
     });
+  }
+  updateLvTotals();
+}
 
-    section.style.display = anyRowVisible ? '' : 'none';
+function updateLvTotals() {
+  const visibleRows = document.querySelectorAll('#lv-body table tr[data-code]:not([style*="display: none"]):not([style*="display:none"])');
+  let totalQty = 0;
+  let totalLines = 0;
+  visibleRows.forEach(r => {
+    // Find qty cell (last td)
+    const cells = r.querySelectorAll('td');
+    const qtyCell = cells[cells.length - 1];
+    if (qtyCell) totalQty += parseInt(qtyCell.textContent) || 0;
+    totalLines++;
   });
+  const linesEl = document.getElementById('lv-totals-lines');
+  const qtyEl   = document.getElementById('lv-totals-qty');
+  if (linesEl) linesEl.textContent = `${totalLines} line${totalLines !== 1 ? 's' : ''}`;
+  if (qtyEl)   qtyEl.textContent   = `${totalQty.toLocaleString()} units total`;
 }
 
 function closeLiveView() {
@@ -4169,6 +4179,7 @@ function closeLiveView() {
   document.body.style.overflow = '';
   const srch = document.getElementById('lv-search');
   if (srch) srch.value = '';
+  updateLvTotals();
 }
 
 function navigateToLocationFromView(locCode) {
