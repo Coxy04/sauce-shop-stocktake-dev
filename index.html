@@ -864,6 +864,25 @@
   </div>
 </div>
 
+<!-- COMPLETE CONFIRM MODAL -->
+<div id="complete-confirm-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:800;align-items:center;justify-content:center;padding:16px;">
+  <div style="background:white;border-radius:12px;width:100%;max-width:420px;overflow:hidden;">
+    <div style="background:#e8401c;color:white;padding:16px 20px;">
+      <div style="font-weight:800;font-size:17px;">⚠️ Complete Stock Take?</div>
+    </div>
+    <div style="padding:20px;">
+      <p style="font-size:15px;color:#1a1a1a;margin:0 0 12px;">This will <strong>overwrite the Live Warehouse</strong> for <strong id="complete-confirm-wh"></strong> with <strong id="complete-confirm-count"></strong> entries from this stock take.</p>
+      <p style="font-size:13px;color:#888;margin:0 0 20px;">All existing live warehouse data for this warehouse will be replaced. This cannot be undone.</p>
+      <div style="display:flex;gap:10px;">
+        <button class="btn btn-secondary" style="flex:1" onclick="closeCompleteConfirmModal()">← Cancel</button>
+        <button class="btn btn-primary" style="flex:2;background:#e8401c;" id="complete-confirm-btn" onclick="confirmAndComplete()">
+          Yes, Complete & Overwrite
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- VARIANCE MODAL -->
 <div id="variance-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:600;overflow-y:auto;padding:16px;">
   <div style="background:white;border-radius:12px;max-width:600px;margin:0 auto;overflow:hidden;">
@@ -965,7 +984,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "2.4.5-dev";
+const APP_VERSION = "2.4.8-dev";
 
 // ============================================================
 // EMBEDDED DATA
@@ -2303,16 +2322,14 @@ async function processProductUpload() {
 // BATCH DROPDOWN HELPER
 // ============================================================
 function getBatchesForProduct(productCode) {
-  // Collect all known batches for this product from live warehouse entries
+  // Collect all known batches for this product across both warehouses
   const batches = new Set();
   lwEntries.forEach(e => {
     if (e.ProductCode === productCode && e.BatchCode) batches.add(e.BatchCode);
   });
-  // Also check current stock take entries
   allEntries.forEach(e => {
     if (e.ProductCode === productCode && e.BatchCode) batches.add(e.BatchCode);
   });
-  // Also check location entries
   locationEntries.forEach(e => {
     if (e.ProductCode === productCode && e.BatchCode) batches.add(e.BatchCode);
   });
@@ -2656,7 +2673,7 @@ function renderStockTakesList(items) {
             ? `<button class="btn btn-primary btn-sm" onclick="openStockTake(${JSON.stringify(st).replace(/"/g, '&quot;')})">Count →</button>`
             : `<button class="btn btn-secondary btn-sm" onclick="viewSummary(${JSON.stringify(st).replace(/"/g, '&quot;')})">Summary</button>`
           }
-          <button class="btn btn-secondary btn-sm" onclick="showStockTakeCompareFromHome(${JSON.stringify(st).replace(/"/g, '&quot;')})">📊</button>
+          <button class="btn btn-secondary btn-sm" onclick="showStockTakeCompareFromHome(${JSON.stringify(st).replace(/"/g, '&quot;')})">📊 Compare</button>
           <button class="btn btn-sm" style="background:none;border:1px solid #e0e0e0;color:#c62828;padding:6px 10px;" onclick="deleteStockTake('${st.id}', '${st.Title.replace(/'/g, "\'")}')">🗑</button>
         </div>
       </div>
@@ -3301,9 +3318,28 @@ function exportVarianceCSV() {
 }
 
 async function acceptVariancesAndComplete() {
-  const btn = document.getElementById('variance-accept-btn');
-  if (btn) { btn.disabled = true; btn.textContent = 'Completing…'; }
   closeVarianceModal();
+  showCompleteConfirmModal();
+}
+
+function showCompleteConfirmModal() {
+  const whName = currentStockTake ? (currentStockTake.Warehouse || 'this warehouse') : 'this warehouse';
+  const entryCount = allEntries.length;
+  document.getElementById('complete-confirm-wh').textContent = whName;
+  document.getElementById('complete-confirm-count').textContent = entryCount;
+  document.getElementById('complete-confirm-modal').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+
+function closeCompleteConfirmModal() {
+  document.getElementById('complete-confirm-modal').style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+async function confirmAndComplete() {
+  closeCompleteConfirmModal();
+  const btn = document.getElementById('complete-confirm-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Completing…'; }
   await doCompleteStockTake();
 }
 
