@@ -343,7 +343,7 @@
               <label>Qty</label>
               <input type="number" id="add-qty" value="1" min="0" step="1" inputmode="numeric" style="text-align:center;font-weight:700;">
             </div>
-            <div class="form-group" style="margin-bottom:0;">
+            <div class="form-group" style="margin-bottom:0;" id="add-batch-container">
               <label>Batch Code</label>
               <div class="input-with-btn">
                 <input type="text" id="add-batch" placeholder="e.g. B240101" autocomplete="off" autocorrect="off" spellcheck="false" style="text-transform:uppercase;">
@@ -433,7 +433,7 @@
               <label>Qty</label>
               <input type="number" id="lc-add-qty" value="1" min="0" step="1" inputmode="numeric" style="text-align:center;font-weight:700;">
             </div>
-            <div class="form-group" style="margin-bottom:0;">
+            <div class="form-group" style="margin-bottom:0;" id="lc-add-batch-container">
               <label>Batch Code</label>
               <div class="input-with-btn">
                 <input type="text" id="lc-add-batch" placeholder="e.g. B240101" autocomplete="off" autocorrect="off" spellcheck="false" style="text-transform:uppercase;">
@@ -965,7 +965,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "2.4.3-dev";
+const APP_VERSION = "2.4.5-dev";
 
 // ============================================================
 // EMBEDDED DATA
@@ -1549,6 +1549,8 @@ function selectLcProduct(product) {
   document.getElementById('lc-sel-prod-code').textContent = product.code;
   document.getElementById('lc-sel-prod-desc').textContent = product.description;
   document.getElementById('lc-add-product-btn').disabled = false;
+  // Render batch dropdown for this product
+  renderBatchDropdown('lc-add-batch-container', 'lc-add-batch', product.code, '');
   document.getElementById('lc-add-qty').focus();
   document.getElementById('lc-add-qty').select();
 }
@@ -1556,7 +1558,7 @@ function selectLcProduct(product) {
 async function addLcProductEntry() {
   if (!lwSelectedProduct || !lwLocation) return;
   const qty = parseInt(document.getElementById('lc-add-qty').value) || 0;
-  const batch = document.getElementById('lc-add-batch').value.trim().toUpperCase();
+  const batch = getBatchValue('lc-add-batch');
   const wh = WAREHOUSES.find(w => w.id === activeWarehouseTab);
   const now = new Date().toISOString();
   const updatedBy = currentAccount ? (currentAccount.name || currentAccount.username) : '';
@@ -1599,7 +1601,9 @@ async function addLcProductEntry() {
   document.getElementById('lc-product-search').value = '';
   document.getElementById('lc-selected-product-preview').style.display = 'none';
   document.getElementById('lc-add-qty').value = '1';
-  document.getElementById('lc-add-batch').value = '';
+  // Reset batch dropdown/input
+  if (lwSelectedProduct) renderBatchDropdown('lc-add-batch-container', 'lc-add-batch', lwSelectedProduct.code, '');
+  else document.getElementById('lc-add-batch').value = '';
   document.getElementById('lc-add-product-btn').disabled = true;
   lwSelectedProduct = null;
   document.getElementById('lc-product-search').focus();
@@ -1811,7 +1815,9 @@ function showSohUploadModal(mode) {
   _sohMode = mode || 'stocktake';
   _parsedSohData = null;
   document.getElementById('soh-upload-title').textContent =
-    mode === 'compare' ? 'Upload Unleashed Stock on Hand' : 'Upload Stock on Hand to Compare';
+    mode === 'compare' ? 'Compare Live Warehouse with Unleashed' :
+    mode === 'stocktake-compare' ? 'Compare Stock Take with Unleashed' :
+    'Upload Stock on Hand to Compare';
   document.getElementById('soh-file-info').style.display = 'none';
   document.getElementById('soh-upload-error').style.display = 'none';
   document.getElementById('soh-upload-btn').disabled = true;
@@ -1939,8 +1945,10 @@ async function processSohUpload() {
 
   if (_sohMode === 'compare') {
     await runLiveWarehouseComparison(_parsedSohData.products);
+  } else if (_sohMode === 'stocktake-compare') {
+    await runStockTakeComparison(_parsedSohData.products);
   } else {
-    // Stock take mode — pass data directly to variance screen, no SharePoint needed
+    // Stock take completion — pass data directly to variance screen
     await showVarianceScreen(_parsedSohData.products);
   }
 }
@@ -1948,6 +1956,53 @@ async function processSohUpload() {
 // ── Compare Live Warehouse vs Unleashed ──────────────────────────────────────
 function showCompareWithUnleashed() {
   showSohUploadModal('compare');
+}
+
+async function runStockTakeComparison(sohProducts) {
+  const entries = _stockTakeCompareEntries || [];
+
+  // Sum counted quantities by product code
+  const countedMap = {};
+  const descMap = {};
+  entries.forEach(e => {
+    countedMap[e.ProductCode] = (countedMap[e.ProductCode] || 0) + (Number(e.CountQty) || 0);
+    if (!descMap[e.ProductCode]) descMap[e.ProductCode] = e.ProductDescription || '';
+  });
+
+  // Unleashed map
+  const unleashedMap = {};
+  const unleashedDescMap = {};
+  sohProducts.forEach(p => {
+    unleashedMap[p.code] = (unleashedMap[p.code] || 0) + p.qty;
+    if (!unleashedDescMap[p.code]) unleashedDescMap[p.code] = p.desc || '';
+  });
+
+  // Build rows
+  const allCodes = new Set([...Object.keys(countedMap), ...Object.keys(unleashedMap)]);
+  const rows = [];
+  allCodes.forEach(code => {
+    const counted   = countedMap[code]   !== undefined ? countedMap[code]   : null;
+    const unleashed = unleashedMap[code] !== undefined ? unleashedMap[code] : null;
+    const variance  = (counted !== null ? counted : 0) - (unleashed !== null ? unleashed : 0);
+    const desc = descMap[code] || unleashedDescMap[code] || '';
+    rows.push({ code, desc, counted, unleashed, variance });
+  });
+  rows.sort((a, b) => Math.abs(b.variance) - Math.abs(a.variance));
+
+  const variances = rows.filter(r => r.variance !== 0).length;
+  const matches   = rows.filter(r => r.variance === 0).length;
+  document.getElementById('compare-summary').textContent =
+    `${_stockTakeCompareName} · ${rows.length} products · ${variances} variances · ${matches} matches`;
+
+  // Reuse compare modal but relabel columns
+  document.querySelector('#compare-modal thead tr th:nth-child(3)').textContent = 'Counted';
+
+  window._compareRows = rows;
+  renderCompareTable(rows);
+  document.getElementById('compare-search').value = '';
+  document.getElementById('compare-filter').value = 'all';
+  document.getElementById('compare-modal').style.display = 'block';
+  document.body.style.overflow = 'hidden';
 }
 
 async function runLiveWarehouseComparison(sohProducts) {
@@ -2042,6 +2097,30 @@ function filterCompareTable() {
   });
   renderCompareTable(filtered);
 }
+
+function showStockTakeCompare() {
+  // Called from within the count screen — uses allEntries
+  _stockTakeCompareEntries = allEntries;
+  _stockTakeCompareName = currentStockTake ? currentStockTake.Title : 'Stock Take';
+  showSohUploadModal('stocktake-compare');
+}
+
+async function showStockTakeCompareFromHome(st) {
+  // Called from home page — need to load entries first
+  toast('Loading entries…', '');
+  try {
+    const allEntryItems = await getListItems(CONFIG.listEntries);
+    const entries = allEntryItems.filter(e => String(e.StockTakeId || e.Title || '') === String(st.id));
+    _stockTakeCompareEntries = entries;
+    _stockTakeCompareName = st.Title;
+    showSohUploadModal('stocktake-compare');
+  } catch(err) {
+    toast('Error loading entries: ' + err.message, 'error');
+  }
+}
+
+let _stockTakeCompareEntries = [];
+let _stockTakeCompareName = '';
 
 function closeCompareModal() {
   document.getElementById('compare-modal').style.display = 'none';
@@ -2218,6 +2297,105 @@ async function processProductUpload() {
   } catch(err) {
     toast('Error uploading products: ' + err.message, 'error');
   }
+}
+
+// ============================================================
+// BATCH DROPDOWN HELPER
+// ============================================================
+function getBatchesForProduct(productCode) {
+  // Collect all known batches for this product from live warehouse entries
+  const batches = new Set();
+  lwEntries.forEach(e => {
+    if (e.ProductCode === productCode && e.BatchCode) batches.add(e.BatchCode);
+  });
+  // Also check current stock take entries
+  allEntries.forEach(e => {
+    if (e.ProductCode === productCode && e.BatchCode) batches.add(e.BatchCode);
+  });
+  // Also check location entries
+  locationEntries.forEach(e => {
+    if (e.ProductCode === productCode && e.BatchCode) batches.add(e.BatchCode);
+  });
+  return [...batches].sort();
+}
+
+function renderBatchDropdown(containerId, inputId, productCode, currentValue) {
+  const batches = getBatchesForProduct(productCode);
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  if (!batches.length) {
+    // No existing batches — just show plain input with scan
+    container.innerHTML = `
+      <label>Batch Code</label>
+      <div class="input-with-btn">
+        <input type="text" id="${inputId}" placeholder="e.g. B240101" autocomplete="off"
+          autocorrect="off" spellcheck="false" style="text-transform:uppercase;"
+          value="${currentValue || ''}">
+        <button class="btn btn-secondary" onclick="openScanner('${inputId}')" title="Scan batch">📷</button>
+      </div>`;
+    return;
+  }
+
+  // Has existing batches — show dropdown + option to type new
+  container.innerHTML = `
+    <label>Batch Code</label>
+    <select id="${inputId}-select" onchange="onBatchSelectChange('${inputId}')"
+      style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:15px;background:white;margin-bottom:6px;">
+      <option value="">— Select batch —</option>
+      ${batches.map(b => `<option value="${b}" ${b === currentValue ? 'selected' : ''}>${b}</option>`).join('')}
+      <option value="__new__">＋ Enter new batch code</option>
+    </select>
+    <div id="${inputId}-new-row" style="display:${currentValue && !batches.includes(currentValue) ? 'flex' : 'none'};gap:8px;">
+      <input type="text" id="${inputId}" placeholder="Type new batch code…" autocomplete="off"
+        autocorrect="off" spellcheck="false" style="flex:1;text-transform:uppercase;"
+        value="${currentValue && !batches.includes(currentValue) ? currentValue : ''}">
+      <button class="btn btn-secondary" onclick="openScanner('${inputId}')" title="Scan batch">📷</button>
+    </div>`;
+
+  // If current value is an existing batch, populate hidden input too
+  if (!document.getElementById(inputId)) {
+    // Create hidden input to hold the value when dropdown is selected
+    const hidden = document.createElement('input');
+    hidden.type = 'hidden';
+    hidden.id = inputId;
+    hidden.value = currentValue || batches[0] || '';
+    container.appendChild(hidden);
+  }
+}
+
+function onBatchSelectChange(inputId) {
+  const select = document.getElementById(inputId + '-select');
+  const newRow = document.getElementById(inputId + '-new-row');
+  const val = select.value;
+
+  if (val === '__new__') {
+    // Show text input for new batch
+    newRow.style.display = 'flex';
+    const input = document.getElementById(inputId);
+    if (input) { input.value = ''; input.focus(); }
+  } else {
+    // Hide text input, use dropdown value
+    newRow.style.display = 'none';
+    // Set or update hidden/visible input
+    let input = document.getElementById(inputId);
+    if (!input) {
+      input = document.createElement('input');
+      input.type = 'hidden';
+      input.id = inputId;
+      document.getElementById(inputId + '-new-row').parentNode.appendChild(input);
+    }
+    input.value = val;
+  }
+}
+
+function getBatchValue(inputId) {
+  // Get the current batch value from either the dropdown or the text input
+  const select = document.getElementById(inputId + '-select');
+  const input  = document.getElementById(inputId);
+  if (select && select.value && select.value !== '__new__') return select.value.toUpperCase();
+  if (input)  return (input.value || '').trim().toUpperCase();
+  return '';
 }
 
 // ============================================================
@@ -2478,6 +2656,7 @@ function renderStockTakesList(items) {
             ? `<button class="btn btn-primary btn-sm" onclick="openStockTake(${JSON.stringify(st).replace(/"/g, '&quot;')})">Count →</button>`
             : `<button class="btn btn-secondary btn-sm" onclick="viewSummary(${JSON.stringify(st).replace(/"/g, '&quot;')})">Summary</button>`
           }
+          <button class="btn btn-secondary btn-sm" onclick="showStockTakeCompareFromHome(${JSON.stringify(st).replace(/"/g, '&quot;')})">📊</button>
           <button class="btn btn-sm" style="background:none;border:1px solid #e0e0e0;color:#c62828;padding:6px 10px;" onclick="deleteStockTake('${st.id}', '${st.Title.replace(/'/g, "\'")}')">🗑</button>
         </div>
       </div>
@@ -2881,7 +3060,7 @@ function selectProduct(product) {
 async function addProductEntry() {
   if (!selectedProduct || !currentLocation) return;
   const qty = parseInt(document.getElementById('add-qty').value) || 0;
-  const batch = document.getElementById('add-batch').value.trim().toUpperCase();
+  const batch = getBatchValue('add-batch');
 
   // Match on BOTH product code AND batch code — different batches = separate lines
   const existing = locationEntries.find(e =>
@@ -2904,7 +3083,9 @@ async function addProductEntry() {
   document.getElementById('product-search').value = '';
   document.getElementById('selected-product-preview').style.display = 'none';
   document.getElementById('add-qty').value = '1';
-  document.getElementById('add-batch').value = '';
+  // Reset batch dropdown/input
+  if (selectedProduct) renderBatchDropdown('add-batch-container', 'add-batch', selectedProduct.code, '');
+  else document.getElementById('add-batch').value = '';
   document.getElementById('add-product-btn').disabled = true;
   selectedProduct = null;
   document.getElementById('product-search').focus();
@@ -3639,10 +3820,17 @@ function handleScannedCode(code, target) {
       toast('Scanned: ' + code, 'success');
     }
   } else if (target === 'add-batch') {
-    document.getElementById('add-batch').value = code.toUpperCase();
+    const abInput = document.getElementById('add-batch');
+    if (abInput) abInput.value = code.toUpperCase();
+    // If dropdown exists, switch to new entry mode
+    const abSelect = document.getElementById('add-batch-select');
+    if (abSelect) { abSelect.value = '__new__'; onBatchSelectChange('add-batch'); document.getElementById('add-batch').value = code.toUpperCase(); }
     toast('Batch scanned: ' + code, 'success');
   } else if (target === 'lc-add-batch') {
-    document.getElementById('lc-add-batch').value = code.toUpperCase();
+    const lcInput = document.getElementById('lc-add-batch');
+    if (lcInput) lcInput.value = code.toUpperCase();
+    const lcSelect = document.getElementById('lc-add-batch-select');
+    if (lcSelect) { lcSelect.value = '__new__'; onBatchSelectChange('lc-add-batch'); document.getElementById('lc-add-batch').value = code.toUpperCase(); }
     toast('Batch scanned: ' + code, 'success');
   } else if (target === 'move-location') {
     const loc = code.toUpperCase();
