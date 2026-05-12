@@ -985,7 +985,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "2.5.0-dev";
+const APP_VERSION = "2.5.2-dev";
 
 // ============================================================
 // EMBEDDED DATA
@@ -2780,8 +2780,22 @@ async function openStockTake(st) {
     allEntries = [];
   }
 
-  // Load previous stock take entries for reference
-  await loadPreviousEntries();
+  // Load live warehouse entries — used for both 'Use ↵' pre-population and batch dropdown
+  try {
+    const allLw = await getListItems(CONFIG.listLiveWarehouse);
+    const whName = wh ? wh.name : '';
+    lwEntries = allLw.filter(e => e.Warehouse === whName);
+    // Build previousEntries from live warehouse (for Use ↵ feature)
+    previousEntries = {};
+    lwEntries.forEach(e => {
+      if (!previousEntries[e.LocationCode]) previousEntries[e.LocationCode] = [];
+      previousEntries[e.LocationCode].push(e);
+    });
+  } catch(err) {
+    console.error('loadPreviousEntries error:', err);
+    lwEntries = [];
+    previousEntries = {};
+  }
 }
 
 async function loadPreviousEntries() {
