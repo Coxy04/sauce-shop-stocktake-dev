@@ -341,7 +341,7 @@
           <div class="flex-row" style="margin-bottom:10px;">
             <div class="form-group" style="flex:0 0 100px;margin-bottom:0;">
               <label>Qty</label>
-              <input type="number" id="add-qty" value="1" min="0" step="1" inputmode="numeric" style="text-align:center;font-weight:700;">
+              <input type="number" id="add-qty" value="1" min="0" step="0.001" inputmode="decimal" style="text-align:center;font-weight:700;">
             </div>
             <div class="form-group" style="margin-bottom:0;" id="add-batch-container">
               <label>Batch Code</label>
@@ -432,7 +432,7 @@
           <div class="flex-row" style="margin-bottom:10px;">
             <div class="form-group" style="flex:0 0 100px;margin-bottom:0;">
               <label>Qty</label>
-              <input type="number" id="lc-add-qty" value="1" min="0" step="1" inputmode="numeric" style="text-align:center;font-weight:700;">
+              <input type="number" id="lc-add-qty" value="1" min="0" step="0.001" inputmode="decimal" style="text-align:center;font-weight:700;">
             </div>
             <div class="form-group" style="margin-bottom:0;" id="lc-add-batch-container">
               <label>Batch Code</label>
@@ -719,7 +719,7 @@
       <label style="font-size:11px;font-weight:700;text-transform:uppercase;color:#888;letter-spacing:0.5px;display:block;margin-bottom:6px;">Quantity to Move</label>
       <div style="display:flex;align-items:center;gap:10px;">
         <button class="qty-btn" onclick="adjustMoveQty(-1)">−</button>
-        <input type="number" id="move-qty" min="1" inputmode="numeric"
+        <input type="number" id="move-qty" min="1" inputmode="decimal"
           style="width:80px;padding:8px;text-align:center;font-size:18px;font-weight:700;border:1.5px solid var(--border);border-radius:8px;">
         <button class="qty-btn" onclick="adjustMoveQty(1)">+</button>
         <span id="move-qty-max" style="font-size:12px;color:#888;"></span>
@@ -985,7 +985,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "2.5.2-dev";
+const APP_VERSION = "2.5.3-dev";
 
 // ============================================================
 // EMBEDDED DATA
@@ -1519,7 +1519,7 @@ function renderLcLocationEntries() {
           <button class="qty-btn" onclick="adjustLcQty('${e.id}', -1)">−</button>
           <input class="qty-input" type="number" value="${e.CountQty}" min="0"
             onchange="updateLcQty('${e.id}', this.value)"
-            onblur="updateLcQty('${e.id}', this.value)" inputmode="numeric">
+            onblur="updateLcQty('${e.id}', this.value)" inputmode="decimal">
           <button class="qty-btn" onclick="adjustLcQty('${e.id}', 1)">+</button>
         </div>
         <div style="font-size:12px;color:var(--text-muted);margin-left:4px;">units</div>
@@ -1577,7 +1577,7 @@ function selectLcProduct(product) {
 
 async function addLcProductEntry() {
   if (!lwSelectedProduct || !lwLocation) return;
-  const qty = parseInt(document.getElementById('lc-add-qty').value) || 0;
+  const qty = parseFloat(document.getElementById('lc-add-qty').value) || 0;
   const batch = getBatchValue('lc-add-batch');
   const wh = WAREHOUSES.find(w => w.id === activeWarehouseTab);
   const now = new Date().toISOString();
@@ -1631,7 +1631,7 @@ async function addLcProductEntry() {
 
 async function updateLcQty(entryId, newQty, silent = false) {
   if (typeof newQty === 'boolean') { silent = newQty; return; }
-  const qty = parseInt(newQty) || 0;
+  const qty = Math.round((parseFloat(newQty) || 0) * 1000) / 1000;
   const entry = lwEntries.find(e => e.id === entryId);
   if (!entry) return;
   const prevQty = entry.CountQty;
@@ -1653,7 +1653,7 @@ async function updateLcQty(entryId, newQty, silent = false) {
 function adjustLcQty(entryId, delta) {
   const entry = lwEntries.find(e => e.id === entryId);
   if (!entry) return;
-  updateLcQty(entryId, Math.max(0, (entry.CountQty || 0) + delta), true);
+  updateLcQty(entryId, Math.max(0, Math.round(((entry.CountQty || 0) + delta) * 1000) / 1000), true);
 }
 
 async function deleteLcEntry(entryId) {
@@ -2499,7 +2499,7 @@ function adjustMoveQty(delta) {
   const input = document.getElementById('move-qty');
   const entry = lwEntries.find(e => e.id === moveEntryId);
   const max = entry ? entry.CountQty : 999;
-  const newVal = Math.min(max, Math.max(1, (parseInt(input.value) || 1) + delta));
+  const newVal = Math.min(max, Math.max(0, Math.round(((parseFloat(input.value) || 0) + delta) * 1000) / 1000));
   input.value = newVal;
 }
 
@@ -2561,7 +2561,7 @@ async function confirmMoveEntry(targetLocation) {
   const entry = lwEntries.find(e => e.id === moveEntryId);
   if (!entry) return;
 
-  const moveQty = parseInt(document.getElementById('move-qty').value) || entry.CountQty;
+  const moveQty = parseFloat(document.getElementById('move-qty').value) || entry.CountQty;
   const remainingQty = entry.CountQty - moveQty;
   const targetWh = WAREHOUSES.find(w => w.id === (moveWarehouseTab || activeWarehouseTab)) || WAREHOUSES[0];
 
@@ -2948,7 +2948,7 @@ function renderLocationEntries() {
         <button class="qty-btn" onclick="adjustQty('${e.id}', -1)">−</button>
         <input class="qty-input" type="number" value="${e.CountQty}" min="0"
           onchange="updateQty('${e.id}', this.value)"
-          onblur="updateQty('${e.id}', this.value)" inputmode="numeric">
+          onblur="updateQty('${e.id}', this.value)" inputmode="decimal">
         <button class="qty-btn" onclick="adjustQty('${e.id}', 1)">+</button>
       </div>
       <button class="del-btn" onclick="deleteEntry('${e.id}')" title="Remove">✕</button>
@@ -3093,7 +3093,7 @@ function selectProduct(product) {
 // ============================================================
 async function addProductEntry() {
   if (!selectedProduct || !currentLocation) return;
-  const qty = parseInt(document.getElementById('add-qty').value) || 0;
+  const qty = parseFloat(document.getElementById('add-qty').value) || 0;
   const batch = getBatchValue('add-batch');
 
   // Match on BOTH product code AND batch code — different batches = separate lines
