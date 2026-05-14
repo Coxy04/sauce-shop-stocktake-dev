@@ -985,7 +985,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "2.5.3-dev";
+const APP_VERSION = "2.5.4-dev";
 
 // ============================================================
 // EMBEDDED DATA
@@ -2573,6 +2573,10 @@ async function confirmMoveEntry(targetLocation) {
   toast(`Moving ${moveQty} × ${entry.ProductCode} to ${targetLocation}…`, '');
 
   try {
+    // Refresh lwEntries from SharePoint to ensure we have latest state before checking
+    const refreshed = await getListItems(CONFIG.listLiveWarehouse);
+    lwEntries = refreshed.filter(e => e.Warehouse === targetWh.name || e.Warehouse === (WAREHOUSES.find(w => w.id === activeWarehouseTab) || WAREHOUSES[0]).name);
+
     // ── Add to target location ────────────────────────────────────────────────
     const existingAtTarget = lwEntries.find(e =>
       e.LocationCode === targetLocation &&
